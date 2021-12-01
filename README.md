@@ -10,7 +10,7 @@ save .world files to your computer's usr/share/gazebo-9/worlds
 ### ! backup your original shapes.world file !
 launch files are in opt/ros/melodic/share/gazebo_ros/launch
 
-## clone repository and catkin make
+### clone repository and catkin make
 
 ## Simulation
 ### Launch world files
