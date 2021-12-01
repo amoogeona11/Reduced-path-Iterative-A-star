@@ -1,4 +1,5 @@
 # Reduced-path-Iterative-A-star
+A* algorithm implemented on a grid map. A car keeps following a moving object(Drone). Reduced path means nodes that are not likely to cause collisions with obstacles are deleted so that the car can drive in more direct way.
 
 Environment
 ============
