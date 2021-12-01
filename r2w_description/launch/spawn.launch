@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+
+    <param name="robot_description" command="cat '$(find r2w_description)/urdf/r2w.xacro'" />
+
+    <arg name="x" default="-10"/>
+    <arg name="y" default="-10"/>
+    <arg name="z" default="0.5"/>
+
+    <node name="r2w_spawn" pkg="gazebo_ros" type="spawn_model" output="screen"
+          args="-urdf -param robot_description -model r2w -x $(arg x) -y $(arg y) -z $(arg z)" />
+
+</launch>

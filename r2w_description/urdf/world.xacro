@@ -1,0 +1,39 @@
+<?xml version="1.0" ?>
+<robot name="world" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+
+  <material name="brown">
+    <color rgba="0.870588235294 0.811764705882 0.764705882353 1.0"/>
+  </material>
+
+  
+  <gazebo reference="wall">
+    <material>Gazebo/brown</material>
+  </gazebo>
+
+  <link name="box0">
+    <!-- pose and inertial -->
+    <pose>0 0 0 0 0 0</pose>
+    <inertial>
+      <mass value="5"/>
+      <origin rpy="0 0 0" xyz="-8 -8 0.5"/>
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1"/>
+    </inertial>
+    <!-- body -->
+    <collision name="collision_box">
+      <geometry>
+        <box size="1 1 1"/>
+      </geometry>
+    </collision>
+    <visual>
+      <origin rpy="0 0 0" xyz="-8 -8 0.5"/>
+      <geometry>
+        <box size="1 1 1"/>
+      </geometry>
+      <material name="brown"/>
+    </visual>
+    
+  </link>
+
+
+</robot>
