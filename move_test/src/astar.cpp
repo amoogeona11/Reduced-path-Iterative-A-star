@@ -7,6 +7,7 @@
 #include "geometry_msgs/Twist.h"
 #include "gazebo_msgs/ModelStates.h"
 #include "gazebo_msgs/GetModelState.h"
+#include "gazebo_msgs/SetModelState.h"
 #include <iostream>
 #include <cmath>
 #include <list>
@@ -245,7 +246,9 @@ public:
         int a,b;
         a = std::round(msg->pose[i].position.x)+10;
         b = std::round(msg->pose[i].position.y)+10;
-        mapp.m[a][b]=1;
+        if (a>=1&&b>=1){
+          mapp.m[a][b]=1;
+        }
         i++;
       }
       len = i+2;
