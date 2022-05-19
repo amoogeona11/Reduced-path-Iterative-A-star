@@ -365,7 +365,7 @@ public:
       l_s.y = 10;
       global_cnt++;
       if (global_cnt==50){
-        flag_global_search = 1;
+        flag_global_search = 0;
       }
       if (flag_global_search == 1){
         //global search
@@ -389,10 +389,12 @@ public:
           int a = std::round(msg->pose[i].position.x) + 10; // obstacle compensated position x
           int b = std::round(msg->pose[i].position.y) + 10;
           global.m[a][b]=1;
+          i++;
         }
         global_path.clear();
         if(g_as.search(g_s,g_e,global)){
           int g_c = g_as.path(global_path);
+          global_path.pop_front();
         }
         
         flag_global_search=0;
@@ -401,10 +403,10 @@ public:
             
       int k=1;
       while(msg->name[k]!="sjtu_drone"){
-        int a = std::round(msg->pose[k].position.x)+10 - robot_posx; // obstacle compensated position x
-        int b = std::round(msg->pose[k].position.y)+10 - robot_posy;
+        int a = std::round(msg->pose[k].position.x)+10 - robot_posx + 10; // obstacle compensated position x
+        int b = std::round(msg->pose[k].position.y)+10 - robot_posy + 10;
         
-        if (0<=a<=20&&0<=b<=20){ //local map 내에 장애물이 감지되면 탐색 진행
+        if ((0<=a&&a<=20)&&(0<=b&&b<=20)){ //local map 내에 장애물이 감지되면 탐색 진행
           l_as.closed.clear();
           l_as.open.clear();
           for(int i=0;i<20;i++){
@@ -412,7 +414,7 @@ public:
               local.m[i][j] = 0;
             }
           }
-          if (0<a<20&&0<b<20){
+          if ((0<a&&a<20)&&(0<b&&b<20)){
             local.m[a][b]=1;
             local.m[a][b+1]=1;
             local.m[a][b-1]=1;
@@ -423,7 +425,7 @@ public:
             local.m[a+1][b]=1;
             local.m[a+1][b+1]=1;
           }
-          else if(a==0&&0<b<20){
+          else if(a==0&&(0<b&&b<20)){
             local.m[a][b]=1;
             local.m[a][b+1]=1;
             local.m[a][b-1]=1;
@@ -431,7 +433,7 @@ public:
             local.m[a+1][b]=1;
             local.m[a+1][b+1]=1;
           }
-          else if(0<a<20&&b==0){
+          else if((0<a&&a<20)&&b==0){
             local.m[a][b]=1;
             local.m[a][b+1]=1;
             local.m[a-1][b]=1;
@@ -459,17 +461,19 @@ public:
             local.m[a][b+1]=1;
             local.m[a-1][b]=1;
           }
-        }
-        k++;
         // local search
         // destination decision required
-        l_s.x = 10;
-        l_s.y = 10;
-        l_e.x = int(std::round(global_path[3].x)) + 10 - robot_posx;
-        l_e.y = int(std::round(global_path[3].y)) + 10 - robot_posy;
-        if(l_as.search(l_s,l_e,local)){
-          int l_c = l_as.path(local_path);
+          l_s.x = 10;
+          l_s.y = 10;
+          l_e.x = int(std::round(global_path[3].x)) + 10 - robot_posx + 10;
+          l_e.y = int(std::round(global_path[3].y)) + 10 - robot_posy + 10;
+          if(l_as.search(l_s,l_e,local)){
+            int l_c = l_as.path(local_path);
+            local_path.pop_front();
+          }
         }
+        k++;
+
       }
 
 
