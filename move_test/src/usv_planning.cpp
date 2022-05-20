@@ -15,7 +15,7 @@
 #include <deque>
 
 const int OFFSET = -10;
-struct quarternion
+struct quaternion
 {
   double w;
   double x;
@@ -302,21 +302,66 @@ public:
     pub_2 = n_.advertise<std_msgs::Float32>("run_time",10);
     sub_ = n_.subscribe<gazebo_msgs::ModelStates>("/gazebo/model_states",10,&SubscribeAndPublish::callback, this);
   }
-  void callback(const gazebo_msgs::ModelStates::ConstPtr& msg){
-    // Global planning 1회 실행. Command를 주면 global planning 시행
-    // Local planning callback function이 돌아갈 때마다 시행
-    // Local planning시 Global path를 기반으로 Goal point 결정 필요
-    // Local trajectory 출력
-  }
-  point decide_local_goal(){
-    // Local planning시 goal point를 결정하는 함수
-  }
-  void controller(std::deque<double> local_trajectory){
-    // trajectory를 입력으로 받아 현재 trajectory를 따라서 주행하는 controller
-  }
-  std::deque<double> spline(std::deque<int> trajectory){
-    // Local Planning 으로 얻은 trajectory를 최적화하여 반환
-  }
+    void callback(const gazebo_msgs::ModelStates::ConstPtr& msg){
+        // Global planning 1회 실행. Command를 주면 global planning 시행
+        // Local planning callback function이 돌아갈 때마다 시행
+        // Local planning시 Global path를 기반으로 Goal point 결정 필요
+        // Local trajectory 출력
+    }
+    point decide_local_goal(){
+        // Local planning시 goal point를 결정하는 함수
+    }
+    geometry_msgs::Twist move_func(std::deque<point> local_trajectory, quaternion quar, double x, double y){
+    // x,y : current robot position
+    // quar : current robot orientation
+    
+    quaternion q = quar;
+    double angle;
+    double vel;
+    double t;
+    double w;
+    double dest_x = local_trajectory[0].x;
+    double dest_y = local_trajectory[0].y;
+    local_trajectory.pop_front();
+    t = 1;
+    angle = std::atan2(2*(q.w*q.z+q.x*q.y),1-(2*(pow(q.y,2)+pow(q.z,2))));
+    double dest_angle = std::atan2(dest_y-y,dest_x-x);
+    //double robot_direction[2] = {x+cos(angle), y+sin(angle)};
+    //double robot_location[2] = {x,y};
+    //double dest_direction[2] = {dest_x, dest_y};
+    double cross_product = cos(angle)*(dest_y-y)-sin(angle)*(dest_x-x);
+    double dot_product = cos(angle)*(dest_x-x)+sin(angle)*(dest_y-y);
+    double dist = sqrt(pow((dest_x-x),2)+pow((dest_y-y),2));
+
+    //vel = 0.2/(dist+1);
+    w = 2*std::acos(dot_product/std::sqrt(pow(dest_x-x,2)+pow(dest_y-y,2)));
+    //vel = 0.5;
+    vel = 0.8/(w+1);
+    ROS_INFO_STREAM("dest_angle:" << dest_angle);
+    ROS_INFO_STREAM("robot_angle:" << angle);
+    ROS_INFO_STREAM("dest_point:" << dest_x << "," << dest_y);
+    if (dist < 0.1) {
+        robot_msg.linear.x = 0;
+        robot_msg.angular.z = 0;
+        local_trajectory.pop_front();
+    }
+    else{
+
+        robot_msg.linear.x = vel;
+
+        if(cross_product<0){
+        robot_msg.angular.z = w;
+        }
+        else{
+        robot_msg.angular.z = -w;
+        }
+        }
+
+    return robot_msg;
+    }
+    std::deque<double> spline(std::deque<int> trajectory){
+        // Local Planning 으로 얻은 trajectory를 최적화하여 반환
+    }
 
 
 private:
@@ -325,4 +370,6 @@ private:
   ros::Publisher pub_1;
   ros::Publisher pub_2;
   ros::Subscriber sub_;
+
+  geometry_msgs::Twist robot_msg;
 };
