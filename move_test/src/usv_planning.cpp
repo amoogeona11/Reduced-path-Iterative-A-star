@@ -291,62 +291,7 @@ public:
     std::list<node> closed;
 };
 
-/////////////////////////////////////////////////////////////////////////////////////////
 
-//int main( int argc, char* argv[] ) {
-//    map m;
-//    int offset = -10;
-//    point s, e( 7, 7 );
-//    aStar as;
-
-//    if( as.search( s, e, m ) ) {
-//        std::list<point> path;
-//        int c = as.path( path );
-//        for( int y = -1; y < 9; y++ ) {
-//            for( int x = -1; x < 9; x++ ) {
-//                if( x < 0 || y < 0 || x > 7 || y > 7 || m( x, y ) == 1 )
-//                    std::cout << "1";
-//                else {
-//                    if( std::find( path.begin(), path.end(), point( x, y ) )!= path.end() )
-//                        std::cout << "x";
-//                    else std::cout << "0";
-//                }
-//            }
-//            std::cout << "\n";
-//        }
-
-//        std::cout << "\nPath cost " << c << ": ";
-//        for( std::list<point>::iterator i = path.begin(); i != path.end(); i++ ) {
-//            std::cout<< "(" << ( *i ).x << ", " << ( *i ).y << ") ";
-//        }
-//    }
-//    std::cout << "\n\n";
-//    return 0;
-//}
-
-geometry_msgs::Twist robot_msg;
-std_msgs::Float32 p_time;
-std_msgs::Float32 r_time;
-
-geometry_msgs::Twist move_func(double x, double y, quarternion quar, double dest_x, double dest_y);
-point l_s, l_e;
-point g_s, g_e;
-local_aStar l_as;
-global_aStar g_as;
-double dest_x;
-double dest_y;
-local_map local;
-global_map global;
-int flag_global_search=1;
-int dx, dy, rx, ry;
-int len;
-int cnt = 1;
-int flag_runtime = 0;
-int flag_waiting = 0;
-double r_s;
-std::deque<point> local_path;
-std::deque<point> global_path;
-int robot_posx, robot_posy;
 class SubscribeAndPublish
 {
 public:
@@ -357,160 +302,20 @@ public:
     pub_2 = n_.advertise<std_msgs::Float32>("run_time",10);
     sub_ = n_.subscribe<gazebo_msgs::ModelStates>("/gazebo/model_states",10,&SubscribeAndPublish::callback, this);
   }
-  // int global_cnt = 0;
   void callback(const gazebo_msgs::ModelStates::ConstPtr& msg){
-      robot_posx = int(std::round(msg->pose.back().position.x)) + 10;
-      robot_posy = int(std::round(msg->pose.back().position.y)) + 10;
-      l_s.x = 10;
-      l_s.y = 10;
-      // global_cnt++;
-      // if (global_cnt==50){
-      //   flag_global_search = 0;
-      // }
-      if (flag_global_search == 1){
-        //global search
-        g_as.closed.clear();
-        g_as.open.clear();
-        for(int i=0;i<100;i++){
-          for(int j=0;j<100;j++){
-            global.m[i][j] = 0;
-          }
-        }
-        rx = int(std::round(msg->pose.back().position.x))+10;
-        ry = int(std::round(msg->pose.back().position.y))+10;
-        dx = int(std::round(msg->pose[len-2].position.x))+10;
-        dy = int(std::round(msg->pose[len-2].position.y))+10;
-        g_s.x = rx;
-        g_s.y = ry;
-        g_e.x = dx;
-        g_e.y = dy;
-        int i=1;
-        while(msg->name[i]!="sjtu_drone"){
-          int a = std::round(msg->pose[i].position.x) + 10; // obstacle compensated position x
-          int b = std::round(msg->pose[i].position.y) + 10;
-          global.m[a][b]=1;
-          i++;
-        }
-        global_path.clear();
-        if(g_as.search(g_s,g_e,global)){
-          int g_c = g_as.path(global_path);
-          global_path.pop_front();
-        }
-        
-        flag_global_search=0;
-        // global_cnt = 0;
-      }
-            
-      int k=1;
-      while(msg->name[k]!="sjtu_drone"){
-        int a = std::round(msg->pose[k].position.x)+10 - robot_posx + 10; // obstacle compensated position x
-        int b = std::round(msg->pose[k].position.y)+10 - robot_posy + 10;
-        
-        if ((0<=a&&a<=20)&&(0<=b&&b<=20)){ //local map 내에 장애물이 감지되면 탐색 진행
-          l_as.closed.clear();
-          l_as.open.clear();
-          for(int i=0;i<20;i++){
-            for(int j=0;j<20;j++){
-              local.m[i][j] = 0;
-            }
-          }
-          if ((0<a&&a<20)&&(0<b&&b<20)){
-            local.m[a][b]=1;
-            local.m[a][b+1]=1;
-            local.m[a][b-1]=1;
-            local.m[a-1][b-1]=1;
-            local.m[a-1][b]=1;
-            local.m[a-1][b+1]=1;
-            local.m[a+1][b-1]=1;
-            local.m[a+1][b]=1;
-            local.m[a+1][b+1]=1;
-          }
-          else if(a==0&&(0<b&&b<20)){
-            local.m[a][b]=1;
-            local.m[a][b+1]=1;
-            local.m[a][b-1]=1;
-            local.m[a+1][b-1]=1;
-            local.m[a+1][b]=1;
-            local.m[a+1][b+1]=1;
-          }
-          else if((0<a&&a<20)&&b==0){
-            local.m[a][b]=1;
-            local.m[a][b+1]=1;
-            local.m[a-1][b]=1;
-            local.m[a-1][b+1]=1;
-            local.m[a+1][b]=1;
-            local.m[a+1][b+1]=1;
-          }
-          else if(a==0&&b==0){
-            local.m[a][b]=1;
-            local.m[a][b+1]=1;
-            local.m[a+1][b]=1;
-          }
-          else if(a==20&&b==20){
-            local.m[a][b]=1;
-            local.m[a][b-1]=1;
-            local.m[a-1][b]=1;
-          }          
-          else if(a==0&&b==20){
-            local.m[a][b]=1;
-            local.m[a][b-1]=1;
-            local.m[a+1][b]=1;
-          }          
-          else if(a==20&&b==0){
-            local.m[a][b]=1;
-            local.m[a][b+1]=1;
-            local.m[a-1][b]=1;
-          }
-        // local search
-        // destination decision required
-          l_s.x = 10;
-          l_s.y = 10;
-          l_e.x = int(std::round(global_path[0].x)) + 10 - robot_posx + 10;
-          l_e.y = int(std::round(global_path[0].y)) + 10 - robot_posy + 10;
-          if(l_as.search(l_s,l_e,local)){
-            int l_c = l_as.path(local_path);
-            local_path.pop_front();
-          }
-        }
-        k++;
-
-      }
-
-
-      ROS_INFO_STREAM("robot name:" << msg->name.back());
-      ROS_INFO_STREAM("Position:" << msg->pose.back().position.x << "," << msg->pose.back().position.y << "," << msg->pose.back().position.z);
-      ROS_INFO_STREAM("destination:" << std::round(msg->pose[len-2].position.x) << "," << std::round(msg->pose[len-2].position.y));
-     // ROS_INFO_STREAM("(" <<path[2].x << "," << path[2].y << ")");
-
-      quarternion robot_quar;
-      robot_quar.w = msg->pose.back().orientation.w;
-      robot_quar.x = msg->pose.back().orientation.x;
-      robot_quar.y = msg->pose.back().orientation.y;
-      robot_quar.z = msg->pose.back().orientation.z;
-      double dest_x = local_path.begin()->x+10;
-      double dest_y = local_path.begin()->y+10;
-      double x = msg->pose.back().position.x;
-      double y = msg->pose.back().position.y;
-      double dist = sqrt(pow((dest_x-x),2)+pow((dest_y-y),2));
-
-      //int c = as.path( path );
-      if(global_path.empty()){
-        robot_msg.linear.x=0;
-        robot_msg.angular.z=0;
-        double r_e = ros::WallTime::now().toSec();
-        r_time.data = r_e - r_s;
-        pub_2.publish(r_time);
-        pub_.publish(robot_msg);
-        flag_waiting = 0;
-        //ros::Duration(0.5).sleep();
-      }
-      else{
-        robot_msg = move_func(x, y, robot_quar, dest_x, dest_y);
-        local_path.pop_front();
-        pub_.publish(robot_msg);
-
-      }
-
+    // Global planning 1회 실행. Command를 주면 global planning 시행
+    // Local planning callback function이 돌아갈 때마다 시행
+    // Local planning시 Global path를 기반으로 Goal point 결정 필요
+    // Local trajectory 출력
+  }
+  point decide_local_goal(){
+    // Local planning시 goal point를 결정하는 함수
+  }
+  void controller(std::deque<double> local_trajectory){
+    // trajectory를 입력으로 받아 현재 trajectory를 따라서 주행하는 controller
+  }
+  std::deque<double> spline(std::deque<int> trajectory){
+    // Local Planning 으로 얻은 trajectory를 최적화하여 반환
   }
 
 
@@ -521,88 +326,3 @@ private:
   ros::Publisher pub_2;
   ros::Subscriber sub_;
 };
-
-//void callback(const gazebo_msgs::ModelStates::ConstPtr& msg);
-
-//ros::NodeHandle nh;
-//ros::Publisher chatter_pub = nh.advertise<geometry_msgs::Twist>("/cmd_vel", 1000);
-//ros::Subscriber chatter_sub = nh.subscribe<gazebo_msgs::ModelStates>("/gazebo/model_states",5,callback);
-
-
-
-geometry_msgs::Twist move_func(double x, double y, quarternion quar, double dest_x, double dest_y){
-
-  quarternion q = quar;
-  double angle;
-  double vel;
-  double t;
-  double w;
-
-  t = 1;
-  angle = std::atan2(2*(q.w*q.z+q.x*q.y),1-(2*(pow(q.y,2)+pow(q.z,2))));
-  double dest_angle = std::atan2(dest_y-y,dest_x-x);
-  //double robot_direction[2] = {x+cos(angle), y+sin(angle)};
-  //double robot_location[2] = {x,y};
-  //double dest_direction[2] = {dest_x, dest_y};
-  double cross_product = cos(angle)*(dest_y-y)-sin(angle)*(dest_x-x);
-  double dot_product = cos(angle)*(dest_x-x)+sin(angle)*(dest_y-y);
-  double dist = sqrt(pow((dest_x-x),2)+pow((dest_y-y),2));
-
-  //vel = 0.2/(dist+1);
-  w = 2*std::acos(dot_product/std::sqrt(pow(dest_x-x,2)+pow(dest_y-y,2)));
-  //vel = 0.5;
-  vel = 0.8/(w+1);
-  ROS_INFO_STREAM("dest_angle:" << dest_angle);
-  ROS_INFO_STREAM("robot_angle:" << angle);
-  ROS_INFO_STREAM("dest_point:" << dest_x << "," << dest_y);
-  if (dist < 0.1) {
-    robot_msg.linear.x = 0;
-    robot_msg.angular.z = 0;
-    global_path.pop_front();
-    global_path.pop_front();
-    global_path.pop_front();
-    global_path.pop_front();
-
-  }
-  else{
-
-    robot_msg.linear.x = vel;
-
-    if(cross_product<0){
-      robot_msg.angular.z = w;
-    }
-    else{
-      robot_msg.angular.z = -w;
-    }
-    }
-
-  return robot_msg;
-}
-
-int main(int argc, char **argv)
-{
-  ros::init(argc, argv, "test_pub");
-
-  ros::Time::init();
-  ros::Rate loop_rate(10);
-  double robot_posx = 0;
-  double robot_posy = 0;
-  SubscribeAndPublish SAPObject;
-
-
-    while (ros::ok())
-    {
-  //    msg.linear.x = 0;
-  //    msg.angular.z = 0;
-  //    chatter_pub.publish(msg);
-
-      ros::spinOnce();
-
-      loop_rate.sleep();
-    }
-
-
-  return 0;
-
-}
-
