@@ -291,7 +291,20 @@ public:
     std::list<node> closed;
 };
 
+int global_flag=1;
+point l_s, l_e;
+point g_s, g_e;
+local_aStar l_as;
+global_aStar g_as;
+int global_goal_x = 400; //임의로 정해준 것
+int global_goal_y = 400;
+point local_goal;
 
+std::deque<point> global_path; // global trajectory
+std::deque<point> local_path; // local trajectory
+
+global_map global;
+local_map local;
 class SubscribeAndPublish
 {
 public:
@@ -304,7 +317,38 @@ public:
   }
     void callback(const gazebo_msgs::ModelStates::ConstPtr& msg){
         // Global planning 1회 실행. Command를 주면 global planning 시행
+        if(global_flag==1){
+            g_s.x = int(std::round(msg->pose.back().position.x)); // 로봇 현재 위치
+            g_s.y = int(std::round(msg->pose.back().position.y));
+            g_e.x = global_goal_x;
+            g_e.y = global_goal_y;
+            //// map 정보 업데이트 필요 ////
+            // global에서는 장애물 없다고 가정해도 좋을듯 
+            if(g_as.search(g_s,g_e,global)){
+                int g_c = g_as.path(global_path);
+            }
+            global_flag=0;
+        }
+
         // Local planning callback function이 돌아갈 때마다 시행
+
+        for(int i=1;i<msg->name.size()-2;i++){
+            int obs_x = msg->pose[i].position.x;
+            int obs_y = msg->pose[i].position.y;
+            local.m[obs_x][obs_y] = 1;
+        }
+
+        local_goal = decide_local_goal(); // 이 함수 어떤 방식으로 할 지 결정 필요
+
+        l_s.x = msg->pose.back().position.x;
+        l_s.y = msg->pose.back().position.y;
+        l_e.x = local_goal.x;
+        l_e.y = local_goal.y;
+
+        if(l_as.search(l_s,l_e,local)){
+            int l_c = l_as.path(local_path);
+        }
+
         // Local planning시 Global path를 기반으로 Goal point 결정 필요
         // Local trajectory 출력
     }
