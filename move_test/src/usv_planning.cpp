@@ -13,7 +13,9 @@
 #include <list>
 #include <algorithm>
 #include <deque>
+#include <eigen3/Eigen/Dense>
 
+using namespace Eigen;
 const int OFFSET = -10;
 struct quaternion
 {
@@ -299,7 +301,7 @@ global_aStar g_as;
 int global_goal_x = 400; //임의로 정해준 것
 int global_goal_y = 400;
 point local_goal;
-
+int global_path_flag=0;
 std::deque<point> global_path; // global trajectory
 std::deque<point> local_path; // local trajectory
 
@@ -317,95 +319,208 @@ public:
   }
     void callback(const gazebo_msgs::ModelStates::ConstPtr& msg){
         // Global planning 1회 실행. Command를 주면 global planning 시행
+        int robot_posx = int(std::round(msg->pose.back().position.x))+10; // 로봇 현재 위치
+        int robot_posy = int(std::round(msg->pose.back().position.y))+10;
+
         if(global_flag==1){
-            g_s.x = int(std::round(msg->pose.back().position.x)); // 로봇 현재 위치
-            g_s.y = int(std::round(msg->pose.back().position.y));
+            for(int i=0; i<20; i++){
+                for(int j=0; j<20; j++){
+                    global.m[i][j]=0;
+                }
+            }
+            g_s.x = robot_posx;
+            g_s.y = robot_posy;
+            global_goal_x = msg->pose[msg->name.size()-2].position.x+10;
+            global_goal_y = msg->pose[msg->name.size()-2].position.y+10;
+            for (int i=1; i<msg->name.size()-2; i++){
+                //global.m[int(std::round(msg->pose[i].position.x))+10][int(std::round(msg->pose[i].position.y))+10] = 1;
+            }
             g_e.x = global_goal_x;
             g_e.y = global_goal_y;
+            global_path.clear();
+            g_as.open.clear();
+            g_as.closed.clear();
             //// map 정보 업데이트 필요 ////
-            // global에서는 장애물 없다고 가정해도 좋을듯 
+            // 현 시뮬레이션에서 global에서는 장애물 없다고 가정해도 좋을듯 
             if(g_as.search(g_s,g_e,global)){
                 int g_c = g_as.path(global_path);
+                global_path.pop_front();
             }
             global_flag=0;
         }
+        ROS_INFO_STREAM("global_goal: x: " << global_path.back().x << "y: " << global_path.back().y);
 
         // Local planning callback function이 돌아갈 때마다 시행
-
-        for(int i=1;i<msg->name.size()-2;i++){
-            int obs_x = msg->pose[i].position.x;
-            int obs_y = msg->pose[i].position.y;
-            local.m[obs_x][obs_y] = 1;
+        for(int i=0;i<20;i++){
+            for(int j=0;j<20;j++){
+            local.m[i][j] = 0;
+            }
         }
+        for(int i=1;i<msg->name.size()-2;i++){
+            int a = int(std::round(msg->pose[i].position.x))+10-robot_posx+10;
+            int b = int(std::round(msg->pose[i].position.y))+10-robot_posy+10;
+            if ((0<=a&&a<=19)&&(0<=b&&b<=19)){ //local map 내에 장애물이 감지되면 탐색 진행
 
-        local_goal = decide_local_goal(); // 이 함수 어떤 방식으로 할 지 결정 필요
 
-        l_s.x = msg->pose.back().position.x;
-        l_s.y = msg->pose.back().position.y;
+                if ((0<a&&a<19)&&(0<b&&b<19)){
+                    local.m[a][b]=1;
+                    local.m[a][b+1]=1;
+                    local.m[a][b-1]=1;
+                    local.m[a-1][b-1]=1;
+                    local.m[a-1][b]=1;
+                    local.m[a-1][b+1]=1;
+                    local.m[a+1][b-1]=1;
+                    local.m[a+1][b]=1;
+                    local.m[a+1][b+1]=1;
+                }
+                else if(a==0&&(0<b&&b<19)){
+                    local.m[a][b]=1;
+                    local.m[a][b+1]=1;
+                    local.m[a][b-1]=1;
+                    local.m[a+1][b-1]=1;
+                    local.m[a+1][b]=1;
+                    local.m[a+1][b+1]=1;
+                }
+                else if((0<a&&a<19)&&b==0){
+                    local.m[a][b]=1;
+                    local.m[a][b+1]=1;
+                    local.m[a-1][b]=1;
+                    local.m[a-1][b+1]=1;
+                    local.m[a+1][b]=1;
+                    local.m[a+1][b+1]=1;
+                }
+                else if(a==0&&b==0){
+                    local.m[a][b]=1;
+                    local.m[a][b+1]=1;
+                    local.m[a+1][b]=1;
+                }
+                else if(a==19&&b==19){
+                    local.m[a][b]=1;
+                    local.m[a][b-1]=1;
+                    local.m[a-1][b]=1;
+                }          
+                else if(a==0&&b==19){
+                    local.m[a][b]=1;
+                    local.m[a][b-1]=1;
+                    local.m[a+1][b]=1;
+                }          
+                else if(a==19&&b==0){
+                    local.m[a][b]=1;
+                    local.m[a][b+1]=1;
+                    local.m[a-1][b]=1;
+                }        
+                }
+        }
+        local_goal = decide_local_goal(global_path, robot_posx, robot_posy); // 이 함수 어떤 방식으로 할 지 결정 필요
+        local.m[local_goal.x][local_goal.y]=0;
+        l_s.x = 10;
+        l_s.y = 10;
         l_e.x = local_goal.x;
         l_e.y = local_goal.y;
-
+        ROS_INFO_STREAM("local start: " << l_s.x << ", " << l_s.y);
+        ROS_INFO_STREAM("local goal: " << l_e.x << ", " << l_e.y);
+        l_as.open.clear();
+        l_as.closed.clear();
         if(l_as.search(l_s,l_e,local)){
+            local_path.clear();
             int l_c = l_as.path(local_path);
+            local_path.pop_front();
+            ROS_INFO_STREAM("local cost: " << l_c);
+        }
+        else{
+            ROS_INFO_STREAM("FAIL");
+        }
+        quaternion robot_quar;
+        robot_quar.w = msg->pose.back().orientation.w;
+        robot_quar.x = msg->pose.back().orientation.x;
+        robot_quar.y = msg->pose.back().orientation.y;
+        robot_quar.z = msg->pose.back().orientation.z;
+        double dest_x = local_path.begin()->x-10+OFFSET;
+        double dest_y = local_path.begin()->y-10+OFFSET;
+        double x = msg->pose.back().position.x;
+        double y = msg->pose.back().position.y;
+        double dist = sqrt(pow((dest_x-x),2)+pow((dest_y-y),2));
+        if(dist<0.01){
+            local_path.pop_front();
+            double dest_x = local_path.begin()->x-10-10;
+            double dest_y = local_path.begin()->y-10-10;
         }
 
+        robot_msg = move_func(x,y,robot_quar,x+10+dest_x,y+10+dest_y);
+        pub_.publish(robot_msg);
         // Local planning시 Global path를 기반으로 Goal point 결정 필요
         // Local trajectory 출력
     }
-    point decide_local_goal(){
+    point decide_local_goal(std::deque<point> global_path, int robot_pose_x, int robot_pose_y){
         // Local planning시 goal point를 결정하는 함수
-    }
-    geometry_msgs::Twist move_func(std::deque<point> local_trajectory, quaternion quar, double x, double y){
-    // x,y : current robot position
-    // quar : current robot orientation
-    
-    quaternion q = quar;
-    double angle;
-    double vel;
-    double t;
-    double w;
-    double dest_x = local_trajectory[0].x;
-    double dest_y = local_trajectory[0].y;
-    local_trajectory.pop_front();
-    t = 1;
-    angle = std::atan2(2*(q.w*q.z+q.x*q.y),1-(2*(pow(q.y,2)+pow(q.z,2))));
-    double dest_angle = std::atan2(dest_y-y,dest_x-x);
-    //double robot_direction[2] = {x+cos(angle), y+sin(angle)};
-    //double robot_location[2] = {x,y};
-    //double dest_direction[2] = {dest_x, dest_y};
-    double cross_product = cos(angle)*(dest_y-y)-sin(angle)*(dest_x-x);
-    double dot_product = cos(angle)*(dest_x-x)+sin(angle)*(dest_y-y);
-    double dist = sqrt(pow((dest_x-x),2)+pow((dest_y-y),2));
-
-    //vel = 0.2/(dist+1);
-    w = 2*std::acos(dot_product/std::sqrt(pow(dest_x-x,2)+pow(dest_y-y,2)));
-    //vel = 0.5;
-    vel = 0.8/(w+1);
-    ROS_INFO_STREAM("dest_angle:" << dest_angle);
-    ROS_INFO_STREAM("robot_angle:" << angle);
-    ROS_INFO_STREAM("dest_point:" << dest_x << "," << dest_y);
-    if (dist < 0.1) {
-        robot_msg.linear.x = 0;
-        robot_msg.angular.z = 0;
-        local_trajectory.pop_front();
-    }
-    else{
-
-        robot_msg.linear.x = vel;
-
-        if(cross_product<0){
-        robot_msg.angular.z = w;
+        point dest;
+        int idx = 0;
+        double min = sqrt(pow(global_path[idx].x-robot_pose_x,2)+pow(global_path[idx].y-robot_pose_y,2));
+        
+        for(int i=1;i<global_path.size()-1;i++){
+            if (min>sqrt(pow(global_path[i].x-robot_pose_x,2)+pow(global_path[i].y-robot_pose_y,2))){
+                idx = i;
+            }
         }
-        else{
-        robot_msg.angular.z = -w;
-        }
-        }
+        for(int i=idx;i<global_path.size()-1;i++){
+            int dest_tmpx = global_path[i].x-robot_pose_x+10;
+            int dest_tmpy = global_path[i].y-robot_pose_y+10;
+            if((dest_tmpx == 19) || (dest_tmpx == 0) || (dest_tmpy ==19) || (dest_tmpy ==0)){
+                dest.x=dest_tmpx;
+                dest.y=dest_tmpy;
+                return dest;
+            }
 
-    return robot_msg;
+        }
     }
-    std::deque<double> spline(std::deque<int> trajectory){
-        // Local Planning 으로 얻은 trajectory를 최적화하여 반환
-    }
+    geometry_msgs::Twist move_func(double x, double y, quaternion quar, double dest_x, double dest_y){
+
+        quaternion q = quar;
+        double angle;
+        double vel;
+        double t;
+        double w;
+
+        t = 1;
+        angle = std::atan2(2*(q.w*q.z+q.x*q.y),1-(2*(pow(q.y,2)+pow(q.z,2))));
+        double dest_angle = std::atan2(dest_y-y,dest_x-x);
+        //double robot_direction[2] = {x+cos(angle), y+sin(angle)};
+        //double robot_location[2] = {x,y};
+        //double dest_direction[2] = {dest_x, dest_y};
+        double cross_product = cos(angle)*(dest_y-y)-sin(angle)*(dest_x-x);
+        double dot_product = cos(angle)*(dest_x-x)+sin(angle)*(dest_y-y);
+        double dist = sqrt(pow((dest_x-x),2)+pow((dest_y-y),2));
+
+        //vel = 0.2/(dist+1);
+        w = 2*std::acos(dot_product/std::sqrt(pow(dest_x-x,2)+pow(dest_y-y,2)));
+        //vel = 0.5;
+        vel = 0.8/(w+1);
+        ROS_INFO_STREAM("dest_angle:" << dest_angle);
+        ROS_INFO_STREAM("robot_angle:" << angle);
+        ROS_INFO_STREAM("dest_point:" << dest_x << "," << dest_y);
+        // if (dist < 0.1) {
+        //     robot_msg.linear.x = 0;
+        //     robot_msg.angular.z = 0;
+        //     // local_path.pop_front();
+        //     // global_path.pop_front();
+        // }
+        
+
+            robot_msg.linear.x = vel;
+
+            if(cross_product<0){
+            robot_msg.angular.z = w;
+            }
+            else{
+            robot_msg.angular.z = -w;
+            }
+            
+
+        return robot_msg;
+        }
+    // std::deque<double> spline(std::deque<int> trajectory){
+    //     // Local Planning 으로 얻은 trajectory를 최적화하여 반환
+    // }
 
 
 private:
@@ -417,3 +532,28 @@ private:
 
   geometry_msgs::Twist robot_msg;
 };
+int main(int argc, char **argv)
+{
+  ros::init(argc, argv, "test_pub");
+
+  ros::Time::init();
+  ros::Rate loop_rate(10);
+  double robot_posx = 0;
+  double robot_posy = 0;
+  SubscribeAndPublish SAPObject;
+
+
+    while (ros::ok())
+    {
+  //    msg.linear.x = 0;
+  //    msg.angular.z = 0;
+  //    chatter_pub.publish(msg);
+
+      ros::spinOnce();
+
+      loop_rate.sleep();
+    }
+
+  return 0;
+
+}

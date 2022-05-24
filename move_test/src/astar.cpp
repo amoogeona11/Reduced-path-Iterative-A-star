@@ -246,9 +246,8 @@ public:
         int a,b;
         a = std::round(msg->pose[i].position.x)+10;
         b = std::round(msg->pose[i].position.y)+10;
-        if (a>=1&&b>=1){
-          mapp.m[a][b]=1;
-        }
+        mapp.m[a][b]=1;
+        
         i++;
       }
       len = i+2;
