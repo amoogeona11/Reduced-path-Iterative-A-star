@@ -361,58 +361,59 @@ public:
             int b = int(std::round(msg->pose[i].position.y))+10-robot_posy+10;
             if ((0<=a&&a<=19)&&(0<=b&&b<=19)){ //local map 내에 장애물이 감지되면 탐색 진행
 
-
-                if ((0<a&&a<19)&&(0<b&&b<19)){
-                    local.m[a][b]=1;
-                    local.m[a][b+1]=1;
-                    local.m[a][b-1]=1;
-                    local.m[a-1][b-1]=1;
-                    local.m[a-1][b]=1;
-                    local.m[a-1][b+1]=1;
-                    local.m[a+1][b-1]=1;
-                    local.m[a+1][b]=1;
-                    local.m[a+1][b+1]=1;
-                }
-                else if(a==0&&(0<b&&b<19)){
-                    local.m[a][b]=1;
-                    local.m[a][b+1]=1;
-                    local.m[a][b-1]=1;
-                    local.m[a+1][b-1]=1;
-                    local.m[a+1][b]=1;
-                    local.m[a+1][b+1]=1;
-                }
-                else if((0<a&&a<19)&&b==0){
-                    local.m[a][b]=1;
-                    local.m[a][b+1]=1;
-                    local.m[a-1][b]=1;
-                    local.m[a-1][b+1]=1;
-                    local.m[a+1][b]=1;
-                    local.m[a+1][b+1]=1;
-                }
-                else if(a==0&&b==0){
-                    local.m[a][b]=1;
-                    local.m[a][b+1]=1;
-                    local.m[a+1][b]=1;
-                }
-                else if(a==19&&b==19){
-                    local.m[a][b]=1;
-                    local.m[a][b-1]=1;
-                    local.m[a-1][b]=1;
-                }          
-                else if(a==0&&b==19){
-                    local.m[a][b]=1;
-                    local.m[a][b-1]=1;
-                    local.m[a+1][b]=1;
-                }          
-                else if(a==19&&b==0){
-                    local.m[a][b]=1;
-                    local.m[a][b+1]=1;
-                    local.m[a-1][b]=1;
-                }        
+                local.m[a][b]=1;
+                // if ((0<a&&a<19)&&(0<b&&b<19)){
+                //     local.m[a][b]=1;
+                //     local.m[a][b+1]=1;
+                //     local.m[a][b-1]=1;
+                //     local.m[a-1][b-1]=1;
+                //     local.m[a-1][b]=1;
+                //     local.m[a-1][b+1]=1;
+                //     local.m[a+1][b-1]=1;
+                //     local.m[a+1][b]=1;
+                //     local.m[a+1][b+1]=1;
+                // }
+                // else if(a==0&&(0<b&&b<19)){
+                //     local.m[a][b]=1;
+                //     local.m[a][b+1]=1;
+                //     local.m[a][b-1]=1;
+                //     local.m[a+1][b-1]=1;
+                //     local.m[a+1][b]=1;
+                //     local.m[a+1][b+1]=1;
+                // }
+                // else if((0<a&&a<19)&&b==0){
+                //     local.m[a][b]=1;
+                //     local.m[a][b+1]=1;
+                //     local.m[a-1][b]=1;
+                //     local.m[a-1][b+1]=1;
+                //     local.m[a+1][b]=1;
+                //     local.m[a+1][b+1]=1;
+                // }
+                // else if(a==0&&b==0){
+                //     local.m[a][b]=1;
+                //     local.m[a][b+1]=1;
+                //     local.m[a+1][b]=1;
+                // }
+                // else if(a==19&&b==19){
+                //     local.m[a][b]=1;
+                //     local.m[a][b-1]=1;
+                //     local.m[a-1][b]=1;
+                // }          
+                // else if(a==0&&b==19){
+                //     local.m[a][b]=1;
+                //     local.m[a][b-1]=1;
+                //     local.m[a+1][b]=1;
+                // }          
+                // else if(a==19&&b==0){
+                //     local.m[a][b]=1;
+                //     local.m[a][b+1]=1;
+                //     local.m[a-1][b]=1;
+                // }        
                 }
         }
         local_goal = decide_local_goal(global_path, robot_posx, robot_posy); // 이 함수 어떤 방식으로 할 지 결정 필요
         local.m[local_goal.x][local_goal.y]=0;
+        local.m[10][10]=0;
         l_s.x = 10;
         l_s.y = 10;
         l_e.x = local_goal.x;
@@ -421,8 +422,9 @@ public:
         ROS_INFO_STREAM("local goal: " << l_e.x << ", " << l_e.y);
         l_as.open.clear();
         l_as.closed.clear();
+        local_path.clear();
+
         if(l_as.search(l_s,l_e,local)){
-            local_path.clear();
             int l_c = l_as.path(local_path);
             local_path.pop_front();
             ROS_INFO_STREAM("local cost: " << l_c);
@@ -430,6 +432,7 @@ public:
         else{
             ROS_INFO_STREAM("FAIL");
         }
+
         quaternion robot_quar;
         robot_quar.w = msg->pose.back().orientation.w;
         robot_quar.x = msg->pose.back().orientation.x;
@@ -440,14 +443,15 @@ public:
         double x = msg->pose.back().position.x;
         double y = msg->pose.back().position.y;
         double dist = sqrt(pow((dest_x-x),2)+pow((dest_y-y),2));
-        if(dist<0.01){
-            local_path.pop_front();
-            double dest_x = local_path.begin()->x-10-10;
-            double dest_y = local_path.begin()->y-10-10;
-        }
-
+        // if(dist<0.01){
+        //     local_path.pop_front();
+        //     double dest_x = local_path.begin()->x-10-10;
+        //     double dest_y = local_path.begin()->y-10-10;
+        // }
+        
         robot_msg = move_func(x,y,robot_quar,x+10+dest_x,y+10+dest_y);
         pub_.publish(robot_msg);
+        
         // Local planning시 Global path를 기반으로 Goal point 결정 필요
         // Local trajectory 출력
     }
@@ -459,6 +463,7 @@ public:
         
         for(int i=1;i<global_path.size()-1;i++){
             if (min>sqrt(pow(global_path[i].x-robot_pose_x,2)+pow(global_path[i].y-robot_pose_y,2))){
+                min = sqrt(pow(global_path[i].x-robot_pose_x,2)+pow(global_path[i].y-robot_pose_y,2));
                 idx = i;
             }
         }
@@ -468,8 +473,15 @@ public:
             if((dest_tmpx == 19) || (dest_tmpx == 0) || (dest_tmpy ==19) || (dest_tmpy ==0)){
                 dest.x=dest_tmpx;
                 dest.y=dest_tmpy;
+                if(dest.x>19){
+                    dest.x=19;
+                }
+                if(dest.y>19){
+                    dest.y=19;
+                }
                 return dest;
             }
+
 
         }
     }
@@ -495,15 +507,16 @@ public:
         w = 2*std::acos(dot_product/std::sqrt(pow(dest_x-x,2)+pow(dest_y-y,2)));
         //vel = 0.5;
         vel = 0.8/(w+1);
-        ROS_INFO_STREAM("dest_angle:" << dest_angle);
-        ROS_INFO_STREAM("robot_angle:" << angle);
+        // ROS_INFO_STREAM("dest_angle:" << dest_angle);
+        // ROS_INFO_STREAM("robot_angle:" << angle);
         ROS_INFO_STREAM("dest_point:" << dest_x << "," << dest_y);
-        // if (dist < 0.1) {
-        //     robot_msg.linear.x = 0;
-        //     robot_msg.angular.z = 0;
-        //     // local_path.pop_front();
-        //     // global_path.pop_front();
-        // }
+
+        if (dist < 0.01) {
+            robot_msg.linear.x = 0;
+            robot_msg.angular.z = 0;
+            //local_path.pop_front();
+            // global_path.pop_front();
+        }
         
 
             robot_msg.linear.x = vel;
@@ -514,7 +527,7 @@ public:
             else{
             robot_msg.angular.z = -w;
             }
-            
+
 
         return robot_msg;
         }
