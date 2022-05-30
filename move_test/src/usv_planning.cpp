@@ -14,6 +14,8 @@
 #include <algorithm>
 #include <deque>
 #include <eigen3/Eigen/Dense>
+#include <geometry_msgs/PoseStamped.h>
+#include <nav_msgs/Path.h>
 
 using namespace Eigen;
 const int OFFSET = -10;
@@ -294,12 +296,13 @@ public:
 };
 
 int global_flag=1;
+int local_flag=0;
 point l_s, l_e;
 point g_s, g_e;
 local_aStar l_as;
 global_aStar g_as;
-int global_goal_x = 400; //임의로 정해준 것
-int global_goal_y = 400;
+int global_goal_x; //임의로 정해준 것
+int global_goal_y;
 point local_goal;
 int global_path_flag=0;
 std::deque<point> global_path; // global trajectory
@@ -307,6 +310,8 @@ std::deque<point> local_path; // local trajectory
 
 global_map global;
 local_map local;
+nav_msgs::Path trajectory;
+geometry_msgs::PoseStamped traj_pose;
 class SubscribeAndPublish
 {
 public:
@@ -315,10 +320,16 @@ public:
     pub_ = n_.advertise<geometry_msgs::Twist>("/cmd_vel", 10);
     pub_1 = n_.advertise<std_msgs::Float32>("process_time",10);
     pub_2 = n_.advertise<std_msgs::Float32>("run_time",10);
+    // pub_3 = n_.advertise<nav_msgs::Path>("trajectory",10);
     sub_ = n_.subscribe<gazebo_msgs::ModelStates>("/gazebo/model_states",10,&SubscribeAndPublish::callback, this);
   }
     void callback(const gazebo_msgs::ModelStates::ConstPtr& msg){
         // Global planning 1회 실행. Command를 주면 global planning 시행
+        quaternion robot_quar;
+        robot_quar.w = msg->pose.back().orientation.w;
+        robot_quar.x = msg->pose.back().orientation.x;
+        robot_quar.y = msg->pose.back().orientation.y;
+        robot_quar.z = msg->pose.back().orientation.z;
         double robot_rawx=msg->pose.back().position.x;
         double robot_rawy=msg->pose.back().position.y;
         double goal_rawx=msg->pose[msg->name.size()-2].position.x;
@@ -351,123 +362,142 @@ public:
                 int g_c = g_as.path(global_path);
                 global_path.pop_front();
                 global_path.push_back(g_e);
+                global_flag=0;
+                local_flag=1;
             }
-            global_flag=0;
         }
-        ROS_INFO_STREAM("global_pose: " << global_goal_x << "y: " << global_goal_y);
+        // ROS_INFO_STREAM("global_pose: " << global_goal_x << "y: " << global_goal_y);
         ROS_INFO_STREAM("global_goal: x: " << global_path.back().x << "y: " << global_path.back().y);
         ROS_INFO_STREAM("robot_pose: " << msg->pose.back().position.x << ", " << msg->pose.back().position.y << "," << msg->pose.back().position.z);
-        if(sqrt(pow((robot_rawx-goal_rawx),2)+pow((robot_rawy-goal_rawy),2))<1){
-
-            robot_msg.linear.x = 0;
-            robot_msg.angular.z = 0;
-
+        if(sqrt(pow((robot_rawx-goal_rawx),2)+pow((robot_rawy-goal_rawy),2))<sqrt(2)){
+            robot_msg = move_func(robot_rawx,robot_rawy,robot_quar,goal_rawx,goal_rawy);
+            pub_.publish(robot_msg);
+            // robot_msg.linear.x = 0;
+            // robot_msg.angular.z = 0;
+            local_flag=0;
             pub_.publish(robot_msg);
             ROS_INFO_STREAM("arrived");
         }
         else{
         // Local planning callback function이 돌아갈 때마다 시행
-        for(int i=0;i<20;i++){
-            for(int j=0;j<20;j++){
-            local.m[i][j] = 0;
-            }
-        }
-        for(int i=1;i<msg->name.size()-2;i++){
-            int a = int(std::round(msg->pose[i].position.x))+10-robot_posx+10;
-            int b = int(std::round(msg->pose[i].position.y))+10-robot_posy+10;
-            if ((0<=a&&a<=19)&&(0<=b&&b<=19)){ //local map 내에 장애물이 감지되면 탐색 진행
+            if(local_flag==1){
+                for(int i=0;i<20;i++){
+                    for(int j=0;j<20;j++){
+                    local.m[i][j] = 0;
+                    }
+                }
+                for(int i=1;i<msg->name.size()-2;i++){
+                    int a = int(std::round(msg->pose[i].position.x))+10-robot_posx+10;
+                    int b = int(std::round(msg->pose[i].position.y))+10-robot_posy+10;
+                    if ((0<=a&&a<=19)&&(0<=b&&b<=19)){ //local map 내에 장애물이 감지되면 탐색 진행
 
-                // local.m[a][b]=1;
-                if ((0<a&&a<19)&&(0<b&&b<19)){ //보수적으로 장애물 위치 지정
-                    local.m[a][b]=1;
-                    local.m[a][b+1]=1;
-                    local.m[a][b-1]=1;
-                    local.m[a-1][b-1]=1;
-                    local.m[a-1][b]=1;
-                    local.m[a-1][b+1]=1;
-                    local.m[a+1][b-1]=1;
-                    local.m[a+1][b]=1;
-                    local.m[a+1][b+1]=1;
+                        // local.m[a][b]=1;
+                        if ((0<a&&a<19)&&(0<b&&b<19)){ //보수적으로 장애물 위치 지정
+                            local.m[a][b]=1;
+                            local.m[a][b+1]=1;
+                            local.m[a][b-1]=1;
+                            local.m[a-1][b-1]=1;
+                            local.m[a-1][b]=1;
+                            local.m[a-1][b+1]=1;
+                            local.m[a+1][b-1]=1;
+                            local.m[a+1][b]=1;
+                            local.m[a+1][b+1]=1;
+                        }
+                        else if(a==0&&(0<b&&b<19)){
+                            local.m[a][b]=1;
+                            local.m[a][b+1]=1;
+                            local.m[a][b-1]=1;
+                            local.m[a+1][b-1]=1;
+                            local.m[a+1][b]=1;
+                            local.m[a+1][b+1]=1;
+                        }
+                        else if((0<a&&a<19)&&b==0){
+                            local.m[a][b]=1;
+                            local.m[a][b+1]=1;
+                            local.m[a-1][b]=1;
+                            local.m[a-1][b+1]=1;
+                            local.m[a+1][b]=1;
+                            local.m[a+1][b+1]=1;
+                        }
+                        else if(a==0&&b==0){
+                            local.m[a][b]=1;
+                            local.m[a][b+1]=1;
+                            local.m[a+1][b]=1;
+                        }
+                        else if(a==19&&b==19){
+                            local.m[a][b]=1;
+                            local.m[a][b-1]=1;
+                            local.m[a-1][b]=1;
+                        }          
+                        else if(a==0&&b==19){
+                            local.m[a][b]=1;
+                            local.m[a][b-1]=1;
+                            local.m[a+1][b]=1;
+                        }          
+                        else if(a==19&&b==0){
+                            local.m[a][b]=1;
+                            local.m[a][b+1]=1;
+                            local.m[a-1][b]=1;
+                        }        
+                        }
                 }
-                else if(a==0&&(0<b&&b<19)){
-                    local.m[a][b]=1;
-                    local.m[a][b+1]=1;
-                    local.m[a][b-1]=1;
-                    local.m[a+1][b-1]=1;
-                    local.m[a+1][b]=1;
-                    local.m[a+1][b+1]=1;
-                }
-                else if((0<a&&a<19)&&b==0){
-                    local.m[a][b]=1;
-                    local.m[a][b+1]=1;
-                    local.m[a-1][b]=1;
-                    local.m[a-1][b+1]=1;
-                    local.m[a+1][b]=1;
-                    local.m[a+1][b+1]=1;
-                }
-                else if(a==0&&b==0){
-                    local.m[a][b]=1;
-                    local.m[a][b+1]=1;
-                    local.m[a+1][b]=1;
-                }
-                else if(a==19&&b==19){
-                    local.m[a][b]=1;
-                    local.m[a][b-1]=1;
-                    local.m[a-1][b]=1;
-                }          
-                else if(a==0&&b==19){
-                    local.m[a][b]=1;
-                    local.m[a][b-1]=1;
-                    local.m[a+1][b]=1;
-                }          
-                else if(a==19&&b==0){
-                    local.m[a][b]=1;
-                    local.m[a][b+1]=1;
-                    local.m[a-1][b]=1;
-                }        
-                }
-        }
-        local_goal = decide_local_goal(global_path, robot_posx, robot_posy); // 이 함수 어떤 방식으로 할 지 결정 필요
-        local.m[local_goal.x][local_goal.y]=0;
-        local.m[10][10]=0;
-        l_s.x = 10;
-        l_s.y = 10;
-        l_e.x = local_goal.x;
-        l_e.y = local_goal.y;
-        ROS_INFO_STREAM("local start: " << l_s.x << ", " << l_s.y);
-        ROS_INFO_STREAM("local goal: " << l_e.x << ", " << l_e.y);
-        l_as.open.clear();
-        l_as.closed.clear();
-        local_path.clear();
+                local_goal = decide_local_goal(global_path, robot_posx, robot_posy); // 이 함수 어떤 방식으로 할 지 결정 필요
+                // local_goal = decide_local_goal(global_path, robot_rawx, robot_rawy);
+                local.m[local_goal.x][local_goal.y]=0;
+                local.m[10][10]=0;
+                l_s.x = 10;
+                l_s.y = 10;
+                l_e.x = local_goal.x;
+                l_e.y = local_goal.y;
+                ROS_INFO_STREAM("local start: " << l_s.x << ", " << l_s.y);
+                ROS_INFO_STREAM("local goal: " << l_e.x << ", " << l_e.y);
+                l_as.open.clear();
+                l_as.closed.clear();
+                local_path.clear();
 
-        if(l_as.search(l_s,l_e,local)){
-            int l_c = l_as.path(local_path);
-            local_path.pop_front();
-            ROS_INFO_STREAM("local_begin: " << local_path.begin()->x << ", " << local_path.begin()->y);
+                if(l_as.search(l_s,l_e,local)){
+                    int l_c = l_as.path(local_path);
+                    local_path.pop_front();
+                    
+                    if(local_path.begin()->x==10 && local_path.begin()->y==10){
+                        local_path.pop_front();
+                    }
+                    ROS_INFO_STREAM("local_begin: " << local_path.begin()->x << ", " << local_path.begin()->y);
+                }
+                else{
+                    ROS_INFO_STREAM("FAIL");
+                }
+                // for(int p=0; p<local_path.size();p++){
+                //     traj_pose.header.frame_id="odom";
+                //     traj_pose.header.seq=p;
+                //     traj_pose.header.stamp = ros::Time::now();
+                //     traj_pose.pose.position.x = local_path[p].x;
+                //     traj_pose.pose.position.y = local_path[p].y;
+                //     traj_pose.pose.position.z = 0;
+                //     traj_pose.pose.orientation.w=0;
+                //     traj_pose.pose.orientation.x=0;
+                //     traj_pose.pose.orientation.y=0;
+                //     traj_pose.pose.orientation.z=1;
 
-        }
-        else{
-            ROS_INFO_STREAM("FAIL");
-        }
+                //     trajectory.poses.push_back(traj_pose);
+                // }
+                
 
-        quaternion robot_quar;
-        robot_quar.w = msg->pose.back().orientation.w;
-        robot_quar.x = msg->pose.back().orientation.x;
-        robot_quar.y = msg->pose.back().orientation.y;
-        robot_quar.z = msg->pose.back().orientation.z;
-        double dest_x = local_path.begin()->x-10;
-        double dest_y = local_path.begin()->y-10;
-        double x = msg->pose.back().position.x;
-        double y = msg->pose.back().position.y;
-        double dist = sqrt(pow((dest_x-x),2)+pow((dest_y-y),2));
-        // if(dist<0.01){
-        //     local_path.pop_front();
-        //     double dest_x = local_path.begin()->x-10-10;
-        //     double dest_y = local_path.begin()->y-10-10;
-        // }
-        
-        robot_msg = move_func(x,y,robot_quar,x+dest_x,y+dest_y);
-        pub_.publish(robot_msg);
+                double dest_x = local_path.begin()->x-10;
+                double dest_y = local_path.begin()->y-10;
+                double x = msg->pose.back().position.x;
+                double y = msg->pose.back().position.y;
+                double dist = sqrt(pow((dest_x-x),2)+pow((dest_y-y),2));
+                // if(dist<0.01){
+                //     local_path.pop_front();
+                //     double dest_x = local_path.begin()->x-10-10;
+                //     double dest_y = local_path.begin()->y-10-10;
+                // }
+                
+                robot_msg = move_func(x,y,robot_quar,x+dest_x,y+dest_y);
+                pub_.publish(robot_msg);
+                // pub_3.publish(trajectory);
+                }
         }
         // Local planning시 Global path를 기반으로 Goal point 결정 필요
         // Local trajectory 출력
@@ -486,7 +516,7 @@ public:
             return dest;
         }
         else{
-            for(int i=1;i<global_path.size();i++){
+            for(int i=0;i<global_path.size();i++){
                 if (min>sqrt(pow(global_path[i].x-robot_pose_x,2)+pow(global_path[i].y-robot_pose_y,2))){
                     min = sqrt(pow(global_path[i].x-robot_pose_x,2)+pow(global_path[i].y-robot_pose_y,2));
                     idx = i;
@@ -533,20 +563,21 @@ public:
         //vel = 0.2/(dist+1);
         w = 2*std::acos(dot_product/std::sqrt(pow(dest_x-x,2)+pow(dest_y-y,2)));
         //vel = 0.5;
-        vel = 0.8/(w+1);
+        vel = 0.8/(abs(w)+1);
+        
         // ROS_INFO_STREAM("dest_angle:" << dest_angle);
         // ROS_INFO_STREAM("robot_angle:" << angle);
         ROS_INFO_STREAM("velocity: " << w << ", " << vel);
         ROS_INFO_STREAM("dest_point:" << dest_x << "," << dest_y);
 
-        if (dist < 0.01) {
+        if (dist < 0.1) {
             robot_msg.linear.x = 0;
             robot_msg.angular.z = 0;
-            local_path.pop_front();
+            // local_path.pop_front();
             // global_path.pop_front();
         }
         
-
+        else{
             robot_msg.linear.x = vel;
 
             if(cross_product<0){
@@ -555,7 +586,7 @@ public:
             else{
             robot_msg.angular.z = -w;
             }
-
+        }
 
         return robot_msg;
         }
@@ -569,6 +600,7 @@ private:
   ros::Publisher pub_;
   ros::Publisher pub_1;
   ros::Publisher pub_2;
+//   ros::Publisher pub_3;
   ros::Subscriber sub_;
 
   geometry_msgs::Twist robot_msg;
