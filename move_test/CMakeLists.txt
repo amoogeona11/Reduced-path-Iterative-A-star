@@ -135,6 +135,13 @@ include_directories(
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(reduced_path_astar src/reduced_path_astar.cpp)
 add_executable(astar src/astar.cpp)
+<<<<<<< Updated upstream
+=======
+add_executable(movingobs src/movingobs.cpp)
+add_executable(usv_astar src/usv_astar.cpp)
+add_executable(usv_planning src/usv_planning.cpp)
+add_executable(usv_planning0620 src/usv_planning0620.cpp)
+>>>>>>> Stashed changes
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -146,6 +153,13 @@ add_executable(astar src/astar.cpp)
 ## same as for the library above
 add_dependencies(reduced_path_astar ${reduced_path_astar_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 add_dependencies(astar ${astar_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+<<<<<<< Updated upstream
+=======
+add_dependencies(movingobs ${movingobs_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(usv_astar ${usv_astar_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(usv_planning ${usv_planning_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(usv_planning0620 ${usv_planning0620_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+>>>>>>> Stashed changes
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(reduced_path_astar
@@ -154,6 +168,21 @@ target_link_libraries(reduced_path_astar
 target_link_libraries(astar
   ${catkin_LIBRARIES}
 )
+<<<<<<< Updated upstream
+=======
+target_link_libraries(movingobs
+  ${catkin_LIBRARIES}
+)
+target_link_libraries(usv_astar
+  ${catkin_LIBRARIES}
+)
+target_link_libraries(usv_planning
+  ${catkin_LIBRARIES}
+)
+target_link_libraries(usv_planning0620
+  ${catkin_LIBRARIES}
+)
+>>>>>>> Stashed changes
 #############
 ## Install ##
 #############
